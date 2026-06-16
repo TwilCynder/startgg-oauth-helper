@@ -144,7 +144,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
  * @param {string} client_secret 
  * @param {string} redirect_uri 
  * @param {string | string []} scopes
- * @param {{authRedirect: string?, callback: string, token: string?}} paths 
+ * @param {{authRedirect: string?, callback: string?, token: string?}} paths 
  * @param {{client_id: number | string, client_secret: string, redirect_uri: string, scopes: string | string []}} oauthConfig 
  * @param {{state: string | (req: ExpressRequest) => string, finalCallback: string | (req: ExpressRequest, res: ExpressResponse) => void | null}} config 
  */
