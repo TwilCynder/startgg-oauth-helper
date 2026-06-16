@@ -33,7 +33,7 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
 
 /**
  * @param {ExpressServer} server 
- * @param {string} path 
+ * @param {string?} path 
  * @param {string | number} client_id 
  * @param {string} client_secret 
  * @param {string} redirect_uri 
@@ -42,6 +42,16 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
  */
 export function initCallbackEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, callback = null){
     const scope = scopes.join ? scopes.join(",") : scopes;
+
+    if (!path) {
+        try {
+            path = new URL(redirect_uri).pathname;
+        } catch (err){
+            throw new Error("Cannot infer the callback endpoint path from the redirect_uri. Your redirect URI seems to be an invalid URL.", {
+                cause: err
+            });
+        }
+    }
 
     const callbackFunction = 
         typeof callback == "function" ? callback :
