@@ -144,16 +144,16 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
  * @param {string} client_secret 
  * @param {string} redirect_uri 
  * @param {string | string []} scopes
- * @param {{authRedirect: string, callback: string, token: string?}} paths 
+ * @param {{authRedirect: string?, callback: string, token: string?}} paths 
  * @param {{client_id: number | string, client_secret: string, redirect_uri: string, scopes: string | string []}} oauthConfig 
- * @param {{tokenEndpoint: boolean, state: string | (req: ExpressRequest) => string, finalCallback: string | (req: ExpressRequest, res: ExpressResponse) => void | null}} config 
+ * @param {{state: string | (req: ExpressRequest) => string, finalCallback: string | (req: ExpressRequest, res: ExpressResponse) => void | null}} config 
  */
 export function initStartggOauth(server, client_id, client_secret, redirect_uri, scopes, paths = {}, config = {}){
     scopes = scopes.join ? scopes.join(",") : scopes;
 
-    initAuthorizationRedirectEndpoint(server, paths.authRedirect, client_id, redirect_uri, scopes, config.state);
+    if (paths.authRedirect) initAuthorizationRedirectEndpoint(server, paths.authRedirect, client_id, redirect_uri, scopes, config.state);
     initCallbackEndpoint(server, paths.callback, client_id, client_secret, redirect_uri, scopes, config.finalCallback);
-    if (config.tokenEndpoint) initTokenEndpoint(server, paths.token, client_id, client_secret, redirect_uri, scopes);
+    if (paths.token) initTokenEndpoint(server, paths.token, client_id, client_secret, redirect_uri, scopes);
 }
 
 /**
