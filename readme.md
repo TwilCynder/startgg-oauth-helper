@@ -27,12 +27,12 @@ Three routes can be initialized by this package, by three separate functions
 The `state` parameter is added to the auth URL, as a `state` query property, which start.gg includes in its own redirection to our "callback" route so we can retrieve it. It can be either a string (which will be passed as-is) or a function taking a Request object and returning a string.  
 - **initCallbackEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, callback)** : initializes the oauth "**callback**" endpoint, which receives the redirect from start.gg's page, and handles obtaining the API token, then saves it using express-session. 
     - Since this endpoint is what start.gg will request using the Redirect URI we gave it, it needs to have the same path as the aformentioned URI. As such, the `path` parameter is uniquely optional on this function, as it can (and should) be infered from the Redirect URI
-    - The token, as well as the Oauth refresh token, and API token expiration date, are saved using express-session under the `startgg` property. This means that after the token is first obtained, and as long as `express-session`'s middleware is in use, for all subsequest requests (to any route) from the same client, `req.session.startgg` will have the following value :
+    - The token, as well as the Oauth refresh token, and API token expiration timestamp, are saved using express-session under the `startgg` property. This means that after the token is first obtained, and as long as `express-session`'s middleware is in use, for all subsequest requests (to any route) from the same client, `req.session.startgg` will have the following value :
         ```js
         {
             access_token: "token",
             refresh_token: "refresh token",
-            expires_in: date
+            expires_at: Date.now() + expires_in_seconds * 1000
 
         }
         ```
