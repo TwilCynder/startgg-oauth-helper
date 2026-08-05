@@ -55,17 +55,17 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
 
     const callbackFunction = 
         typeof callback == "function" ? callback :
-        typeof callback == "string" ? (_, res) => res.redirect(callback) :
-        () => res.redirect("/");
+        typeof callback == "string" ? (_req, res) => res.redirect(callback) :
+        (_req, res) => res.redirect("/");
 
     server.get(path, async (req, res) => {
         const code = req.query.code;
         if (!code){
-            console.error("No code ?");
-            res.send("Start.gg didn't send a code. idk what to tell you man");
+            res.status(400).send("Start.gg didn't send a code.");
+            return;
         } 
 
-        const responseBody = await fetch("https://api.start.gg/oauth/access_token", {
+        const tokenResponse = await fetch("https://api.start.gg/oauth/access_token", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -78,12 +78,19 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
                 redirect_uri,
                 scope
             })
-        }).then(response => response.json());
+        });
+
+        if (!tokenResponse.ok) {
+            res.status(502).send("Token exchange failed: " + tokenResponse.status);
+            return;
+        }
+
+        const responseBody = await tokenResponse.json();
 
         req.session.startgg = {
             access_token: responseBody.access_token,
             refresh_token: responseBody.refresh_token,
-            expires_in: responseBody.expires_in
+            expires_at: Date.now() + responseBody.expires_in * 1000
         }
 
         callbackFunction(req, res);
@@ -100,13 +107,13 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
 
     server.get(path, async (req, res) => {
         if (req.session.startgg){
-            if (Date.now() > req.session.startgg.expires_in){
+            if (Date.now() > req.session.startgg.expires_at){
                 const refresh_token = req.session.startgg.refresh_token;
                 if (!refresh_token){
                     return res.status(401).json({err: "Not authenticated"})
                 }   
 
-                const responseBody = await fetch("https://api.start.gg/oauth/refresh", {
+                const refreshResponse = await fetch("https://api.start.gg/oauth/refresh", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
@@ -119,15 +126,20 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
                         redirect_uri,
                         scope
                     })
-                }).then(response => response.json());
+                });
+
+                if (!refreshResponse.ok) {
+                    req.session.startgg = null;
+                    return res.status(401).json({err: "Token refresh failed: " + refreshResponse.status});
+                }
+
+                const responseBody = await refreshResponse.json();
 
                 req.session.startgg = {
                     access_token: responseBody.access_token,
                     refresh_token: responseBody.refresh_token,
-                    expires_in: responseBody.expires_in
+                    expires_at: Date.now() + responseBody.expires_in * 1000
                 }
-
-                console.log("New token :", responseBody.access_token);
             }
 
             return res.status(200).json({token: req.session.startgg.access_token});
