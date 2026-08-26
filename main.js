@@ -31,8 +31,13 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
     })
 }
 
-/** @typedef {{access_token: string, refresh_token: string, expires_in: number}} StartggData @param {Request} req @param {StartggData} responseBody */
-function defaultTokenSetter(req, responseBody){
+/** 
+ * @typedef {{access_token: string, refresh_token: string, expires_in: number}} StartggData 
+ * @param {Request} req 
+ * @param {StartggData} responseBody 
+ * @param {boolean} isNew 
+*/
+function defaultTokenSetter(req, responseBody, isNew){
     req.session.startgg = {
         access_token: responseBody.access_token,
         refresh_token: responseBody.refresh_token,
@@ -91,7 +96,7 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
             })
         }).then(response => response.json());
 
-        responseHandlerCallback(req, responseBody);
+        responseHandlerCallback(req, responseBody, true);
 
         callbackFunction(req, res);
     })
@@ -133,7 +138,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
                     })
                 }).then(response => response.json());
 
-                responseHandlerCallback(req, responseBody);
+                responseHandlerCallback(req, responseBody, false);
                 //console.log("New token :", responseBody.access_token);
             }
 
