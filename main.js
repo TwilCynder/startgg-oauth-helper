@@ -31,6 +31,15 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
     })
 }
 
+/** @typedef {{access_token: string, refresh_token: string, expires_in: number}} StartggData @param {Request} req @param {StartggData} responseBody */
+function defaultTokenSetter(req, responseBody){
+    req.session.startgg = {
+        access_token: responseBody.access_token,
+        refresh_token: responseBody.refresh_token,
+        expires_in: responseBody.expires_in
+    }
+}
+
 /**
  * @param {ExpressServer} server 
  * @param {string?} path 
@@ -39,8 +48,9 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
  * @param {string} redirect_uri 
  * @param {string | string []} scopes
  * @param {string | (req: ExpressRequest, res: ExpressResponse) => void | null} callback
+ * @param {typeof defaultTokenSetter} responseHandlerCallback
  */
-export function initCallbackEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, callback = null){
+export function initCallbackEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, callback = null, responseHandlerCallback = defaultTokenSetter){
     const scope = scopes.join ? scopes.join(",") : scopes;
 
     if (!path) {
@@ -62,7 +72,8 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
         const code = req.query.code;
         if (!code){
             console.error("No code ?");
-            res.send("Start.gg didn't send a code. idk what to tell you man");
+            res.status(500).send("start.gg sent a request to the redirect URI as if the authorization succeeded, but did not send the required code");
+            return;
         } 
 
         const responseBody = await fetch("https://api.start.gg/oauth/access_token", {
@@ -80,28 +91,29 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
             })
         }).then(response => response.json());
 
-        req.session.startgg = {
-            access_token: responseBody.access_token,
-            refresh_token: responseBody.refresh_token,
-            expires_in: responseBody.expires_in
-        }
+        responseHandlerCallback(req, responseBody);
 
         callbackFunction(req, res);
     })
 }
 
+/** @param {Request} req @return {StartggData} */
+function defaultTokenGetter(req){
+    if (req.session) return req.session.startgg;
+}
+
 /**
- * 
  * @param {ExpressServer} server 
  * @param {string} path 
  */
-export function initTokenEndpoint(server, path, client_id, client_secret, redirect_uri, scopes){
+export function initTokenEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, startggDataGetter = defaultTokenGetter, responseHandlerCallback = defaultTokenSetter){
     const scope = scopes.join ? scopes.join(",") : scopes;
 
     server.get(path, async (req, res) => {
-        if (req.session.startgg){
-            if (Date.now() > req.session.startgg.expires_in){
-                const refresh_token = req.session.startgg.refresh_token;
+        const startgg = startggDataGetter(req);
+        if (startgg){
+            if (Date.now() > startgg.expires_in){
+                const refresh_token = startgg.refresh_token;
                 if (!refresh_token){
                     return res.status(401).json({err: "Not authenticated"})
                 }   
@@ -121,16 +133,11 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
                     })
                 }).then(response => response.json());
 
-                req.session.startgg = {
-                    access_token: responseBody.access_token,
-                    refresh_token: responseBody.refresh_token,
-                    expires_in: responseBody.expires_in
-                }
-
-                console.log("New token :", responseBody.access_token);
+                responseHandlerCallback(req, responseBody);
+                //console.log("New token :", responseBody.access_token);
             }
 
-            return res.status(200).json({token: req.session.startgg.access_token});
+            return res.status(200).json({token: responseBody.access_token});
         } else {
             return res.status(401).json({err: "Not authenticated"});
         }
@@ -146,14 +153,14 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
  * @param {string | string []} scopes
  * @param {{authRedirect: string?, callback: string?, token: string?}} paths 
  * @param {{client_id: number | string, client_secret: string, redirect_uri: string, scopes: string | string []}} oauthConfig 
- * @param {{state: string | (req: ExpressRequest) => string, finalCallback: string | (req: ExpressRequest, res: ExpressResponse) => void | null}} config 
+ * @param {{state?: string | (req: ExpressRequest) => string, finalCallback?: string | (req: ExpressRequest, res: ExpressResponse) => void | null, responseHandlerCallback?: typeof defaultTokenSetter, startggDataGetter?: typeof defaultTokenGetter}} config 
  */
 export function initStartggOauth(server, client_id, client_secret, redirect_uri, scopes, paths = {}, config = {}){
     scopes = scopes.join ? scopes.join(",") : scopes;
 
     if (paths.authRedirect) initAuthorizationRedirectEndpoint(server, paths.authRedirect, client_id, redirect_uri, scopes, config.state);
-    initCallbackEndpoint(server, paths.callback, client_id, client_secret, redirect_uri, scopes, config.finalCallback);
-    if (paths.token) initTokenEndpoint(server, paths.token, client_id, client_secret, redirect_uri, scopes);
+    initCallbackEndpoint(server, paths.callback, client_id, client_secret, redirect_uri, scopes, config.finalCallback, config.responseHandlerCallback);
+    if (paths.token) initTokenEndpoint(server, paths.token, client_id, client_secret, redirect_uri, scopes, config.startggDataGetter, config.responseHandlerCallback);
 }
 
 /**
