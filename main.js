@@ -41,7 +41,7 @@ function defaultTokenSetter(req, responseBody, isNew){
     const obj = {
         access_token: responseBody.access_token,
         refresh_token: responseBody.refresh_token,
-        expires_in: responseBody.expires_in
+        expiration_date: Date.now() + responseBody.expires_in * 1000
     }
     req.session.startgg = obj;
     return obj;
@@ -104,7 +104,7 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
     })
 }
 
-/** @param {Request} req @return {StartggData} */
+/** @param {Request} req @return {ReturnType<defaultTokenSetter>} */
 function defaultTokenGetter(req){
     if (req.session) return req.session.startgg;
 }
@@ -119,7 +119,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
     server.get(path, async (req, res) => {
         let startgg = startggDataGetter(req);
         if (startgg){
-            if (Date.now() > startgg.expires_in){
+            if (Date.now() > startgg.expiration_date){
                 const refresh_token = startgg.refresh_token;
                 if (!refresh_token){
                     return res.status(401).json({err: "Not authenticated"})

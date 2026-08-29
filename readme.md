@@ -32,7 +32,7 @@ The `state` parameter is added to the auth URL, as a `state` query property, whi
         {
             access_token: "token",
             refresh_token: "refresh token",
-            expires_in: timestamp
+            expiration_date: jsTimestamp
 
         }
         ```
@@ -42,8 +42,8 @@ The `state` parameter is added to the auth URL, as a `state` query property, whi
       - function : this function will be called with the `req` and `res` objects as parameters. In this case no redirection will be performed unless your callback does it itself !
 - **initTokenEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, startggDataGetter, responseHandlerCallback)** [OPTIONAL] : initializes the "**token**" route, which returns the token to the client. This is useful if you want your client code to actually be able to obtain the token (to run start.gg API requests from the client code) ; another option is to let the server handle all API requests (on demand from the client, which means setting up your own routes, basically a proxy API), which is a bit more complicated to setup but usually considered better practice as the token is never passed to the client. Which is actually not that much of an issue but yknow, security.
 Note that this route handles **refreshing the token** : if the client asks for the token and it's expired, this route will refresh it (by sending a request to start.gg's refresh_token endpoint with the refresh_token we got along the API token) before sending the new one to the client. 
-By default, the token is retrieved from cookies using express-session ; it is however possible to change that behavior using the `startggDataGetter(req)` callback, which is supposed to return an object containing an **access token**, **expiration date** and **refresh token**, in the same from as the object saved by the default behavior of `initCallbackEndpoint` (see in-code documentation).  
-The way the token is saved after being refreshed can also be customized in the same way as with `initCallbackEndpoint`, through the `responseHandlerCallback`
+By default, the token is retrieved from cookies using express-session ; it is however possible to change that behavior using the `startggDataGetter(req)` callback, which is supposed to return an object containing an **access token**, **expiration date** and **refresh token**, in the same form as the object saved by the default behavior of `initCallbackEndpoint` (also check in-code documentation for the expected type of the callback).  
+The way the token is saved after being refreshed can also be customized in the same way as with `initCallbackEndpoint`, through the `responseHandlerCallback`. If the `responseHandlerCallback` returns a value, it will be treated as an object containing the token sent after refreshing (same expected return type as `startggDataGetter`); if it doesn't, the `startggDataGetter` will be called right after saving the new data. 
 
 Note that calling all these functions can be condensed into one call to **initStartggOauth(server, client_id, client_secret, redirect_uri, scopes, paths = {}, config = {})**
 - The `paths` parameter must be an object containing the path for each route.
