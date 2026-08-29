@@ -38,11 +38,13 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
  * @param {boolean} isNew 
 */
 function defaultTokenSetter(req, responseBody, isNew){
-    req.session.startgg = {
+    const obj = {
         access_token: responseBody.access_token,
         refresh_token: responseBody.refresh_token,
         expires_in: responseBody.expires_in
     }
+    req.session.startgg = obj;
+    return obj;
 }
 
 /**
@@ -71,7 +73,7 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
     const callbackFunction = 
         typeof callback == "function" ? callback :
         typeof callback == "string" ? (_, res) => res.redirect(callback) :
-        () => res.redirect("/");
+        (_, res) => res.redirect("/");
 
     server.get(path, async (req, res) => {
         const code = req.query.code;
@@ -115,7 +117,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
     const scope = scopes.join ? scopes.join(",") : scopes;
 
     server.get(path, async (req, res) => {
-        const startgg = startggDataGetter(req);
+        let startgg = startggDataGetter(req);
         if (startgg){
             if (Date.now() > startgg.expires_in){
                 const refresh_token = startgg.refresh_token;
@@ -138,11 +140,11 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
                     })
                 }).then(response => response.json());
 
-                responseHandlerCallback(req, responseBody, false);
+                startgg = responseHandlerCallback(req, responseBody, false) ?? startggDataGetter(req);
                 //console.log("New token :", responseBody.access_token);
             }
 
-            return res.status(200).json({token: responseBody.access_token});
+            return res.status(200).json({token: startgg.access_token});
         } else {
             return res.status(401).json({err: "Not authenticated"});
         }
