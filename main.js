@@ -133,9 +133,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
     server.get(path, async (req, res) => {
         let startgg = startggDataGetter(req);
         if (startgg){
-            console.log(Date.now(), startgg.expiration_date)
             if (Date.now() > startgg.expiration_date){
-                console.log("Refreshed")
                 const refresh_token = startgg.refresh_token;
                 if (!refresh_token){
                     return res.status(401).json({err: "Not authenticated"})

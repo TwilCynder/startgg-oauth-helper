@@ -1,6 +1,6 @@
 {
   "name": "startgg-oauth-helper",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
