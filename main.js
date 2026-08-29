@@ -2,6 +2,7 @@
  * @typedef {ReturnType<import("express")>} ExpressServer
  * @typedef {import("express").Request} ExpressRequest
  * @typedef {import("express").Response} ExpressResponse
+ * @typedef {{access_token: string, refresh_token: string, expires_in: number}} StartggResponseData 
  */
 
 /**
@@ -32,25 +33,30 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
 }
 
 /**
- * Converts a duration in seconds to the JS date that will be reached from now after this time has elapsed - effectively converting an OAuth `expires_in` field to an expiration date (comparable with Date.now())
+ * Converts a duration in seconds to the date (JS timestamp) that will be reached from now after this time has elapsed - effectively converting an OAuth `expires_in` field to an expiration date (comparable with Date.now())
  * @param {number} expires_in 
  */
 export function getExpirationDate(expires_in){
     return Date.now() + expires_in * 1000;
 }
 
-/** 
- * @typedef {{access_token: string, refresh_token: string, expires_in: number}} StartggData 
- * @param {Request} req 
- * @param {StartggData} responseBody 
- * @param {boolean} isNew 
-*/
-function defaultTokenSetter(req, responseBody, isNew){
-    const obj = {
+/** @param {StartggResponseData} responseBody @returns */
+export function makeStandardStartggData(responseBody){
+    return {
         access_token: responseBody.access_token,
         refresh_token: responseBody.refresh_token,
         expiration_date: getExpirationDate(responseBody.expires_in)
     }
+}
+
+/** 
+ * @typedef {ReturnType<makeStandardStartggData>} StartggStandardData
+ * @param {Request} req 
+ * @param {StartggResponseData} responseBody 
+ * @param {boolean} isNew 
+*/
+function defaultTokenSetter(req, responseBody, isNew){
+    const obj = makeStandardStartggData(responseBody)
     req.session.startgg = obj;
     return obj;
 }
@@ -112,7 +118,7 @@ export function initCallbackEndpoint(server, path, client_id, client_secret, red
     })
 }
 
-/** @param {Request} req @return {ReturnType<defaultTokenSetter>} */
+/** @param {Request} req @return {StartggStandardData} */
 function defaultTokenGetter(req){
     if (req.session) return req.session.startgg;
 }
@@ -127,7 +133,9 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
     server.get(path, async (req, res) => {
         let startgg = startggDataGetter(req);
         if (startgg){
+            console.log(Date.now(), startgg.expiration_date)
             if (Date.now() > startgg.expiration_date){
+                console.log("Refreshed")
                 const refresh_token = startgg.refresh_token;
                 if (!refresh_token){
                     return res.status(401).json({err: "Not authenticated"})
