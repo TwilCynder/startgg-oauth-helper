@@ -21,6 +21,10 @@
   "homepage": "https://gitlab.com/TwilCynder/startgg-oauth-helper#readme",
   "description": "",
   "devDependencies": {
-    "@types/express": "^5.0.6"
-  }
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0"
+  },
+  "files": [],
+  "type": "module"
 }
