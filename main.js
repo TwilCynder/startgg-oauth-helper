@@ -31,6 +31,14 @@ export function initAuthorizationRedirectEndpoint(server, path, client_id, redir
     })
 }
 
+/**
+ * Converts a duration in seconds to the JS date that will be reached from now after this time has elapsed - effectively converting an OAuth `expires_in` field to an expiration date (comparable with Date.now())
+ * @param {number} expires_in 
+ */
+export function getExpirationDate(expires_in){
+    return Date.now() + expires_in * 1000;
+}
+
 /** 
  * @typedef {{access_token: string, refresh_token: string, expires_in: number}} StartggData 
  * @param {Request} req 
@@ -41,7 +49,7 @@ function defaultTokenSetter(req, responseBody, isNew){
     const obj = {
         access_token: responseBody.access_token,
         refresh_token: responseBody.refresh_token,
-        expiration_date: Date.now() + responseBody.expires_in * 1000
+        expiration_date: getExpirationDate(responseBody.expires_in)
     }
     req.session.startgg = obj;
     return obj;
