@@ -124,14 +124,27 @@ function defaultTokenGetter(req){
 }
 
 /**
+ * @typedef {string | (req: Request) => string} CORSConfig
  * @param {ExpressServer} server 
  * @param {string} path 
+ * @param {{startggDataGetter: typeof defaultTokenGetter, responseHandlerCallback: typeof defaultTokenSetter, cors?: CORSConfig}} config 
  */
-export function initTokenEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, startggDataGetter = defaultTokenGetter, responseHandlerCallback = defaultTokenSetter){
+export function initTokenEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, config){
+    config = Object.assign({
+        startggDataGetter: defaultTokenGetter,
+        responseHandlerCallback: defaultTokenSetter,
+        cors: null
+    }, config);
+
     const scope = scopes.join ? scopes.join(",") : scopes;
+    const cors = config.cors;
+    const corsF = typeof cors === "function" ? cors : () => cors;
 
     server.get(path, async (req, res) => {
-        let startgg = startggDataGetter(req);
+        const corsValue = corsF(req);
+        if (corsValue) res.setHeader("Access-Control-Allow-Origin", corsValue);
+
+        let startgg = config.startggDataGetter(req);
         if (startgg){
             if (Date.now() > startgg.expiration_date){
                 const refresh_token = startgg.refresh_token;
@@ -154,8 +167,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
                     })
                 }).then(response => response.json());
 
-                startgg = responseHandlerCallback(req, responseBody, false) ?? startggDataGetter(req);
-                //console.log("New token :", responseBody.access_token);
+                startgg = config.responseHandlerCallback(req, responseBody, false) ?? startggDataGetter(req);
             }
 
             return res.status(200).json({token: startgg.access_token});
@@ -174,14 +186,14 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
  * @param {string | string []} scopes
  * @param {{authRedirect: string?, callback: string?, token: string?}} paths 
  * @param {{client_id: number | string, client_secret: string, redirect_uri: string, scopes: string | string []}} oauthConfig 
- * @param {{state?: string | (req: ExpressRequest) => string, finalCallback?: string | (req: ExpressRequest, res: ExpressResponse) => void | null, responseHandlerCallback?: typeof defaultTokenSetter, startggDataGetter?: typeof defaultTokenGetter}} config 
+ * @param {{state?: string | (req: ExpressRequest) => string, finalCallback?: string | (req: ExpressRequest, res: ExpressResponse) => void | null, responseHandlerCallback?: typeof defaultTokenSetter, startggDataGetter?: typeof defaultTokenGetter, cors: CORSConfig}} config 
  */
 export function initStartggOauth(server, client_id, client_secret, redirect_uri, scopes, paths = {}, config = {}){
     scopes = scopes.join ? scopes.join(",") : scopes;
 
     if (paths.authRedirect) initAuthorizationRedirectEndpoint(server, paths.authRedirect, client_id, redirect_uri, scopes, config.state);
     initCallbackEndpoint(server, paths.callback, client_id, client_secret, redirect_uri, scopes, config.finalCallback, config.responseHandlerCallback);
-    if (paths.token) initTokenEndpoint(server, paths.token, client_id, client_secret, redirect_uri, scopes, config.startggDataGetter, config.responseHandlerCallback);
+    if (paths.token) initTokenEndpoint(server, paths.token, client_id, client_secret, redirect_uri, scopes, config);
 }
 
 /**

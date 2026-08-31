@@ -43,6 +43,7 @@ initStartggOauth(app, process.env.SGG_OAUTH_CLIENT_ID, process.env.SGG_OAUTH_CLI
 }, {
     responseHandlerCallback: testPointlessSetter,
     startggDataGetter: testPointlessGetter,
+    cors: "test"
 });
 
 app.use(express.static("./site"))
