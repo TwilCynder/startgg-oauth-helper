@@ -124,9 +124,39 @@ function defaultTokenGetter(req){
 }
 
 /**
+ * 
+ * @param {*} refresh_token 
+ * @param {string | number} client_id 
+ * @param {string} client_secret 
+ * @param {string} redirect_uri 
+ * @param {string | string []} scopes
+ * @returns {Promise<StartggResponseData>}
+ */
+export async function refreshToken(refresh_token, client_id, client_secret, redirect_uri, scope){
+    return fetch("https://api.start.gg/oauth/refresh", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            client_id,
+            client_secret,
+            refresh_token,
+            grant_type: "refresh_token",
+            redirect_uri,
+            scope
+        })
+    }).then(response => response.json());
+}
+
+/**
  * @typedef {string | (req: Request) => string} CORSConfig
  * @param {ExpressServer} server 
  * @param {string} path 
+ * @param {string | number} client_id 
+ * @param {string} client_secret 
+ * @param {string} redirect_uri 
+ * @param {string | string []} scopes
  * @param {{startggDataGetter: typeof defaultTokenGetter, responseHandlerCallback: typeof defaultTokenSetter, cors?: CORSConfig}} config 
  */
 export function initTokenEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, config){
@@ -152,20 +182,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
                     return res.status(401).json({err: "Not authenticated"})
                 }   
 
-                const responseBody = await fetch("https://api.start.gg/oauth/refresh", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        client_id,
-                        client_secret,
-                        refresh_token,
-                        grant_type: "refresh_token",
-                        redirect_uri,
-                        scope
-                    })
-                }).then(response => response.json());
+                const responseBody = await refreshToken(refresh_token, client_id, client_secret, redirect_uri, scope);
 
                 startgg = config.responseHandlerCallback(req, responseBody, false) ?? startggDataGetter(req);
             }
