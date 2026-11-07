@@ -5,6 +5,8 @@
  * @typedef {{access_token: string, refresh_token: string, expires_in: number}} StartggResponseData 
  */
 
+import { createAPIResponseError } from "./src/error.js";
+
 /**
  * @param {number | string} client_id 
  * @param {string} redirect_uri 
@@ -130,7 +132,6 @@ function defaultTokenGetter(req){
  * @param {string} client_secret 
  * @param {string} redirect_uri 
  * @param {string | string []} scopes
- * @returns {Promise<StartggResponseData>}
  */
 export async function refreshToken(refresh_token, client_id, client_secret, redirect_uri, scope){
     return fetch("https://api.start.gg/oauth/refresh", {
@@ -146,24 +147,26 @@ export async function refreshToken(refresh_token, client_id, client_secret, redi
             redirect_uri,
             scope
         })
-    }).then(response => response.json());
+    });
 }
 
 /**
  * @typedef {string | (req: Request) => string} CORSConfig
+ * @typedef {(err: Error) => void} ErrorHandler
  * @param {ExpressServer} server 
  * @param {string} path 
  * @param {string | number} client_id 
  * @param {string} client_secret 
  * @param {string} redirect_uri 
  * @param {string | string []} scopes
- * @param {{startggDataGetter: typeof defaultTokenGetter, responseHandlerCallback: typeof defaultTokenSetter, cors?: CORSConfig}} config 
+ * @param {{startggDataGetter: typeof defaultTokenGetter, responseHandlerCallback: typeof defaultTokenSetter, cors?: CORSConfig, errorHandler: ErrorHandler}} config 
  */
 export function initTokenEndpoint(server, path, client_id, client_secret, redirect_uri, scopes, config){
     config = Object.assign({
         startggDataGetter: defaultTokenGetter,
         responseHandlerCallback: defaultTokenSetter,
-        cors: null
+        cors: null,
+        errorHandler: (err) => console.error("Error while processing request :", err)
     }, config);
 
     const scope = scopes.join ? scopes.join(",") : scopes;
@@ -181,10 +184,15 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
                 if (!refresh_token){
                     return res.status(401).json({err: "Not authenticated"})
                 }   
-
-                const responseBody = await refreshToken(refresh_token, client_id, client_secret, redirect_uri, scope);
-
-                startgg = config.responseHandlerCallback(req, responseBody, false) ?? startggDataGetter(req);
+                
+                const refreshResponse = await refreshToken(refresh_token, client_id, client_secret, redirect_uri, scope)
+                if (refreshResponse.ok){
+                    const responseBody = await refreshResponse.json();
+                    startgg = config.responseHandlerCallback(req, responseBody, false) ?? startggDataGetter(req);
+                } else {
+                    config.errorHandler(await createAPIResponseError("Could not refresh the token", refreshResponse));
+                    return res.status(500).json({err: "Invalid API response while trying to refresh token"});
+                }
             }
 
             return res.status(200).json({token: startgg.access_token});
@@ -203,7 +211,7 @@ export function initTokenEndpoint(server, path, client_id, client_secret, redire
  * @param {string | string []} scopes
  * @param {{authRedirect: string?, callback: string?, token: string?}} paths 
  * @param {{client_id: number | string, client_secret: string, redirect_uri: string, scopes: string | string []}} oauthConfig 
- * @param {{state?: string | (req: ExpressRequest) => string, finalCallback?: string | (req: ExpressRequest, res: ExpressResponse) => void | null, responseHandlerCallback?: typeof defaultTokenSetter, startggDataGetter?: typeof defaultTokenGetter, cors: CORSConfig}} config 
+ * @param {{state?: string | (req: ExpressRequest) => string, finalCallback?: string | (req: ExpressRequest, res: ExpressResponse) => void | null, responseHandlerCallback?: typeof defaultTokenSetter, startggDataGetter?: typeof defaultTokenGetter, cors: CORSConfig, errorHandler: ErrorHandler}} config 
  */
 export function initStartggOauth(server, client_id, client_secret, redirect_uri, scopes, paths = {}, config = {}){
     scopes = scopes.join ? scopes.join(",") : scopes;
